@@ -749,12 +749,12 @@ class Boinkers:
                         reward_type = task['prizes'][0]['prizeTypeName']
                         delay = task['secondsToAllowClaim']
 
-                        if task['type'] == 'linkWithId':
-                            continue
-                        if delay == 172800:
-                            continue
-
                         if task is not None:
+                            if task['type'] == 'linkWithId':
+                                continue
+                            if delay == 172800:
+                                continue
+                            
                             start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
                             started = start.get('clickDateTime', None)
                             claimed = start.get('claimDateTime', None)
