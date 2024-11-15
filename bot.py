@@ -282,6 +282,39 @@ class Boinkers:
             time.sleep(2)
 
         return None
+
+    def claim_inbox(self, token: str, message_id: str, retries=3):
+        url = 'https://boink.boinkers.co/api/inboxMessages/claimInboxMessagePrize?p=android'
+        data = json.dumps({'inboxMessageId':message_id})
+        self.headers.update({
+            'Authorization': token,
+            'Content-Type': 'application/json'
+        })
+
+        attempt = 0
+        while attempt < retries:
+            try:
+                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                if response.status_code == 200:
+                    try:
+                        return response.json()
+                    except requests.JSONDecodeError:
+                        return None
+                else:
+                    return None
+            except (requests.Timeout, requests.ConnectionError) as e:
+                print(
+                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                    end="\r",
+                    flush=True
+                )
+            attempt += 1
+            time.sleep(2)
+
+        return None
         
     def tasks(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/rewardedActions/getRewardedActionList?p=android'
@@ -664,6 +697,50 @@ class Boinkers:
                     )
                 time.sleep(1)
 
+                inbox = user['inboxMessages']
+                if inbox:
+                    completed = False
+                    for message in inbox:
+                        message_id = message['_id']
+                        status = message['state']
+
+                        if message and status != "claimed":
+                            claim_inbox = self.claim_inbox(new_token if 'new_token' in locals() else token, message_id)
+                            if claim_inbox:
+                                reward = claim_inbox['gottenPrize']['prizeValue']
+                                reward_type = claim_inbox['gottenPrize']['prizeName']
+                                self.log(
+                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Inbox{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {message['title']} {Style.RESET_ALL}"
+                                    f"{Fore.GREEN+Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                                )
+                            else:
+                                self.log(
+                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Inbox{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {message['title']} {Style.RESET_ALL}"
+                                    f"{Fore.RED+Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
+                        else:
+                            completed = True
+
+                    if completed:
+                        self.log(
+                                f"{Fore.MAGENTA+Style.BRIGHT}[ Inbox{Style.RESET_ALL}"
+                                f"{Fore.GREEN+Style.BRIGHT} Clear {Style.RESET_ALL}"
+                                f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                            )
+                else:
+                    self.log(
+                        f"{Fore.MAGENTA+Style.BRIGHT}[ Inbox{Style.RESET_ALL}"
+                        f"{Fore.YELLOW+Style.BRIGHT} No Available Message {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                    )
+                time.sleep(1)
+
                 tasks = self.tasks(new_token if 'new_token' in locals() else token)
                 if tasks:
                     for task in tasks:
@@ -677,11 +754,11 @@ class Boinkers:
                         if delay == 172800:
                             continue
 
-                        if task:
+                        if task is not None:
                             start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
                             started = start.get('clickDateTime', None)
                             claimed = start.get('claimDateTime', None)
-                            if start and started and not claimed:
+                            if start is not None and started and not claimed:
                                 self.log(
                                     f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
                                     f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
@@ -724,7 +801,7 @@ class Boinkers:
                                     )
                                 time.sleep(1)
 
-                            elif start and started and claimed:
+                            elif start is not None and started and claimed:
                                 self.log(
                                     f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
                                     f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
@@ -748,7 +825,7 @@ class Boinkers:
 
                 games_energy = user['gamesEnergy']
                 if games_energy:
-                    id = '6734f851c2f3f6fa4ec5891e'
+                    id = '673362f891989d6c4cd4fbdb'
                     multipliers = [50, 25, 10, 5, 3, 2, 1]
 
                     for game_type, details in games_energy.items():
