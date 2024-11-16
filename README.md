@@ -1,5 +1,5 @@
 # Boinkers BOT
-Boinkers BOT `Added Soon`
+Boinkers BOT
 
 Register Here : [Boinkers](https://t.me/boinker_bot/boinkapp?startapp=boink1493482017)
 
