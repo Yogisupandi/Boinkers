@@ -315,6 +315,72 @@ class Boinkers:
             time.sleep(2)
 
         return None
+
+    def collect_friends(self, token: str, friend_id: str, retries=3):
+        url = f'https://boink.boinkers.co/api/friends/claimFriendMoonBoinkerReward/{friend_id}?p=android'
+        data = {}
+        self.headers.update({
+            'Authorization': token,
+            'Content-Type': 'application/json'
+        })
+
+        attempt = 0
+        while attempt < retries:
+            try:
+                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                if response.status_code == 200:
+                    try:
+                        return response.json()
+                    except requests.JSONDecodeError:
+                        return None
+                else:
+                    return None
+            except (requests.Timeout, requests.ConnectionError) as e:
+                print(
+                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                    end="\r",
+                    flush=True
+                )
+            attempt += 1
+            time.sleep(2)
+
+        return None
+
+    def push_friends(self, token: str, friend_id: str, retries=3):
+        url = f'https://boink.boinkers.co/api/friends/pushFriendToPlay/{friend_id}?p=android'
+        data = {}
+        self.headers.update({
+            'Authorization': token,
+            'Content-Type': 'application/json'
+        })
+
+        attempt = 0
+        while attempt < retries:
+            try:
+                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                if response.status_code == 200:
+                    try:
+                        return response.json()
+                    except requests.JSONDecodeError:
+                        return None
+                else:
+                    return None
+            except (requests.Timeout, requests.ConnectionError) as e:
+                print(
+                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                    end="\r",
+                    flush=True
+                )
+            attempt += 1
+            time.sleep(2)
+
+        return None
         
     def tasks(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/rewardedActions/getRewardedActionList?p=android'
@@ -741,6 +807,56 @@ class Boinkers:
                     )
                 time.sleep(1)
 
+                friends = user['friendsInvited']
+                if friends:
+                    for friend in friends:
+                        friend_id = friend['_id']
+
+                        if friend is not None:
+                            collect = self.collect_friends(new_token if 'new_token' in locals() else token, friend_id)
+                            if collect and collect['invitedFriendsData']:
+                                self.log(
+                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {friend['userName']} {Style.RESET_ALL}"
+                                    f"{Fore.GREEN+Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {collect['energyReward']} Spin Energy {Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                                )
+                            else:
+                                self.log(
+                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {friend['userName']} {Style.RESET_ALL}"
+                                    f"{Fore.YELLOW+Style.BRIGHT}No Availabe Reward to Claim{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
+                            time.sleep(1)
+
+                            push = self.push_friends(new_token if 'new_token' in locals() else token, friend_id)
+                            if push and push['invitedFriendsData']:
+                                self.log(
+                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {friend['userName']} {Style.RESET_ALL}"
+                                    f"{Fore.GREEN+Style.BRIGHT}Is Pushed{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
+                            else:
+                                self.log(
+                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} {friend['userName']} {Style.RESET_ALL}"
+                                    f"{Fore.YELLOW+Style.BRIGHT}Not Time to Push{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
+                            time.sleep(1)
+
+                else:
+                    self.log(
+                        f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
+                        f"{Fore.YELLOW+Style.BRIGHT} No Available Friend {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                    )
+                time.sleep(1)              
+
                 tasks = self.tasks(new_token if 'new_token' in locals() else token)
                 if tasks:
                     for task in tasks:
@@ -756,14 +872,19 @@ class Boinkers:
                                 continue
                             
                             start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
+
+                            if start is None:
+                                continue
+
                             started = start.get('clickDateTime', None)
                             claimed = start.get('claimDateTime', None)
-                            if start is not None and started and not claimed:
+
+                            if started and not claimed:
                                 self.log(
-                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                    f"{Fore.GREEN+Style.BRIGHT}Is Started{Style.RESET_ALL}"
-                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                    f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                    f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
                                 )
                                 for remaining in range(delay, 0, -1):
                                     print(
@@ -785,36 +906,37 @@ class Boinkers:
                                 claim = self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
                                 if claim and claim['newUserRewardedAction']['claimDateTime']:
                                     self.log(
-                                        f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                        f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                        f"{Fore.GREEN+Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
-                                        f"{Fore.MAGENTA+Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
-                                        f"{Fore.WHITE+Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
-                                        f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                        f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
                                     )
                                 else:
                                     self.log(
-                                        f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                        f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                        f"{Fore.RED+Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
-                                        f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}            "
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                        f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
                                     )
                                 time.sleep(1)
 
-                            elif start is not None and started and claimed:
+                            elif started and claimed:
                                 self.log(
-                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                    f"{Fore.YELLOW+Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
-                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                    f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                    f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
                                 )
                             else:
                                 self.log(
-                                    f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                    f"{Fore.RED+Style.BRIGHT}Isn't Started{Style.RESET_ALL}"
-                                    f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                    f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                    f"{Fore.RED + Style.BRIGHT}Isn't Started{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
                                 )
+
                 else:
                     self.log(
                         f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
@@ -825,7 +947,7 @@ class Boinkers:
 
                 games_energy = user['gamesEnergy']
                 if games_energy:
-                    id = '673362f891989d6c4cd4fbdb'
+                    id = '6737c92317471f54fb06adcb'
                     multipliers = [50, 25, 10, 5, 3, 2, 1]
 
                     for game_type, details in games_energy.items():
