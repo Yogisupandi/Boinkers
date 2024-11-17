@@ -51,6 +51,20 @@ class Boinkers:
         hours, remainder = divmod(seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+    
+    def load_liveopid(self):
+        url = "https://raw.githubusercontent.com/vonssy/Response.JSON/refs/heads/main/boinkers_id.json"
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            return data.get('liveOpId', [])[0]['id']
+        except requests.exceptions.RequestException as e:
+            self.log(f"{Fore.RED + Style.BRIGHT}Error: Failed to fetch data from URL. {e}{Style.RESET_ALL}")
+            return []
+        except json.JSONDecodeError:
+            self.log(f"{Fore.RED + Style.BRIGHT}Error: Failed to parse JSON data.{Style.RESET_ALL}")
+            return []
 
     def extract_user_data(self, query: str) -> str:
         parsed_query = parse_qs(query)
@@ -857,97 +871,97 @@ class Boinkers:
                     )
                 time.sleep(1)              
 
-                # tasks = self.tasks(new_token if 'new_token' in locals() else token)
-                # if tasks:
-                #     for task in tasks:
-                #         name_id = task['nameId']
-                #         reward = task['prizes'][0]['prizeValue']
-                #         reward_type = task['prizes'][0]['prizeTypeName']
-                #         delay = task['secondsToAllowClaim']
+                tasks = self.tasks(new_token if 'new_token' in locals() else token)
+                if tasks:
+                    for task in tasks:
+                        name_id = task['nameId']
+                        reward = task['prizes'][0]['prizeValue']
+                        reward_type = task['prizes'][0]['prizeTypeName']
+                        delay = task['secondsToAllowClaim']
 
-                #         if task is not None:
-                #             if task['type'] == 'linkWithId':
-                #                 continue
-                #             if delay == 172800:
-                #                 continue
+                        if task is not None:
+                            if task['type'] == 'linkWithId':
+                                continue
+                            if delay == 172800:
+                                continue
                             
-                #             start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
+                            start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
 
-                #             if start is None:
-                #                 continue
+                            if start is None:
+                                continue
 
-                #             started = start.get('clickDateTime', None)
-                #             claimed = start.get('claimDateTime', None)
+                            started = start.get('clickDateTime', None)
+                            claimed = start.get('claimDateTime', None)
 
-                #             if started and not claimed:
-                #                 self.log(
-                #                     f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                #                     f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                #                     f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
-                #                     f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                #                 )
-                #                 for remaining in range(delay, 0, -1):
-                #                     print(
-                #                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                #                         f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                #                         f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
-                #                         f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
-                #                         f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
-                #                         f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
-                #                         end="\r",
-                #                         flush=True
-                #                     )
-                #                     time.sleep(1)
+                            if started and not claimed:
+                                self.log(
+                                    f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                    f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                    f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
+                                for remaining in range(delay, 0, -1):
+                                    print(
+                                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
+                                        f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
+                                        end="\r",
+                                        flush=True
+                                    )
+                                    time.sleep(1)
 
-                #                 if task['type'] == 'watch-ad':
-                #                     key = task['verification']['paramKey']
-                #                     self.watch_ads(new_token if 'new_token' in locals() else token, key)
+                                if task['type'] == 'watch-ad':
+                                    key = task['verification']['paramKey']
+                                    self.watch_ads(new_token if 'new_token' in locals() else token, key)
 
-                #                 claim = self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
-                #                 if claim and claim['newUserRewardedAction']['claimDateTime']:
-                #                     self.log(
-                #                         f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                #                         f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                #                         f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
-                #                         f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
-                #                         f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
-                #                         f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                #                     )
-                #                 else:
-                #                     self.log(
-                #                         f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                #                         f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                #                         f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
-                #                         f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
-                #                     )
-                #                 time.sleep(1)
+                                claim = self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
+                                if claim and claim['newUserRewardedAction']['claimDateTime']:
+                                    self.log(
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                        f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                    )
+                                else:
+                                    self.log(
+                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                        f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
+                                    )
+                                time.sleep(1)
 
-                #             elif started and claimed:
-                #                 self.log(
-                #                     f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                #                     f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                #                     f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
-                #                     f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                #                 )
-                #             else:
-                #                 self.log(
-                #                     f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                #                     f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                #                     f"{Fore.RED + Style.BRIGHT}Isn't Started{Style.RESET_ALL}"
-                #                     f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                #                 )
+                            elif started and claimed:
+                                self.log(
+                                    f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                    f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                    f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
+                            else:
+                                self.log(
+                                    f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                    f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                    f"{Fore.RED + Style.BRIGHT}Isn't Started{Style.RESET_ALL}"
+                                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                )
 
-                # else:
-                #     self.log(
-                #         f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                #         f"{Fore.RED+Style.BRIGHT} Data Is None{Style.RESET_ALL}"
-                #         f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
-                #     )
-                # time.sleep(1)
+                else:
+                    self.log(
+                        f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                        f"{Fore.RED+Style.BRIGHT} Data Is None{Style.RESET_ALL}"
+                        f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                    )
+                time.sleep(1)
 
                 games_energy = user['gamesEnergy']
                 if games_energy:
-                    id = '6737c92317471f54fb06adcb'
+                    id = self.load_liveopid()
                     multipliers = [50, 25, 10, 5, 3, 2, 1]
 
                     for game_type, details in games_energy.items():
