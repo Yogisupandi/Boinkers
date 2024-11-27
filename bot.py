@@ -807,7 +807,7 @@ class Boinkers:
                             claim_inbox = self.claim_inbox(new_token if 'new_token' in locals() else token, message_id)
                             if claim_inbox:
                                 reward = claim_inbox['gottenPrize']['prizeValue']
-                                reward_type = claim_inbox['gottenPrize']['prizeName']
+                                reward_type = claim_inbox.get('gottenPrize', {}).get('prizeName', 'Gold')
                                 self.log(
                                     f"{Fore.MAGENTA+Style.BRIGHT}[ Inbox{Style.RESET_ALL}"
                                     f"{Fore.WHITE+Style.BRIGHT} {message['title']} {Style.RESET_ALL}"
