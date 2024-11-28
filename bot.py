@@ -51,20 +51,6 @@ class Boinkers:
         hours, remainder = divmod(seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
-    
-    def load_liveopid(self):
-        url = "https://raw.githubusercontent.com/vonssy/Response.JSON/refs/heads/main/boinkers_id.json"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            data = response.json()
-            return data.get('liveOpId', [])[0]['id']
-        except requests.exceptions.RequestException as e:
-            self.log(f"{Fore.RED + Style.BRIGHT}Error: Failed to fetch data from URL. {e}{Style.RESET_ALL}")
-            return []
-        except json.JSONDecodeError:
-            self.log(f"{Fore.RED + Style.BRIGHT}Error: Failed to parse JSON data.{Style.RESET_ALL}")
-            return []
 
     def extract_user_data(self, query: str) -> str:
         parsed_query = parse_qs(query)
@@ -202,6 +188,31 @@ class Boinkers:
     def load_queries(self):
         with open('query.txt', 'r') as file:
             return [line.strip() for line in file if line.strip()]
+        
+    def load_liveOpId(self, retries=3):
+        url = 'https://boink.boinkers.co/public/data/config?p=android'
+        self.headers.update({
+            'Content-Type': 'application/json'
+        })
+
+        for attempt in range(retries):
+            try:
+                response = self.session.get(url, headers=self.headers, timeout=10)
+                response.raise_for_status()
+                return response.json()['liveOps'][0]['_id']
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
 
     def users_login(self, query: str, retries=3):
         url = 'https://boink.boinkers.co/public/users/loginByTelegram?tgWebAppStartParam=boink1493482017&p=android'
@@ -210,30 +221,24 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()['token']
-                    except requests.JSONDecodeError:
-                        return None
+                response.raise_for_status()
+                return response.json()['token']
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
         
     def users_me(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/users/me?p=android'
@@ -242,30 +247,24 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.get(url, headers=self.headers, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
 
     def claim_booster(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/boinkers/addShitBooster?p=android'
@@ -275,27 +274,27 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
-                if response.status_code == 200:
-                    return True
-                else:
+                if response.status_code == 403:
                     return False
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
+                
+                response.raise_for_status()
+                return True
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
 
     def claim_inbox(self, token: str, message_id: str, retries=3):
         url = 'https://boink.boinkers.co/api/inboxMessages/claimInboxMessagePrize?p=android'
@@ -305,30 +304,24 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
 
     def collect_friends(self, token: str, friend_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/friends/claimFriendMoonBoinkerReward/{friend_id}?p=android'
@@ -338,30 +331,27 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                if response.status_code == 403:
+                    return None
+                
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
 
     def push_friends(self, token: str, friend_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/friends/pushFriendToPlay/{friend_id}?p=android'
@@ -371,30 +361,27 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                if response.status_code == 403:
+                    return None
+                
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
         
     def tasks(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/rewardedActions/getRewardedActionList?p=android'
@@ -403,30 +390,24 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.get(url, headers=self.headers, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
         
     def start_tasks(self, token: str, name_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/rewardedActions/rewardedActionClicked/{name_id}?p=android'
@@ -436,8 +417,7 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 200:
@@ -447,19 +427,19 @@ class Boinkers:
                         return None
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
     def claim_tasks(self, token: str, name_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/rewardedActions/claimRewardedAction/{name_id}?p=android'
@@ -469,8 +449,7 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 200:
@@ -480,19 +459,19 @@ class Boinkers:
                         return None
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
     def watch_ads(self, token: str, key: str, retries=3):
         url = 'https://boink.boinkers.co/api/rewardedActions/ad-watched?p=android'
@@ -502,93 +481,86 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
                 if response.status_code == 200:
                     return True
                 else:
                     return False
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
+                else:
+                    return None
         
-    def spin_wheel(self, token: str, game_type: str, id: str, multiplier: str, retries=3):
+    def spin_wheel(self, token: str, game_type: str, liveOpId: str, multiplier: str, retries=3):
         url = f'https://boink.boinkers.co/api/play/spin{game_type.capitalize()}/{multiplier}?p=android'
-        data = json.dumps({'liveOpId':id} if id else {})
+        data = json.dumps({'liveOpId':liveOpId} if id else {})
         self.headers.update({
             'Authorization': token,
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                if response.status_code == 403:
+                    return None
+                    
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
     
-    def open_elevator(self, token: str, id: str, retries=3):
+    def open_elevator(self, token: str, liveOpId: str, retries=3):
         url = 'https://boink.boinkers.co/api/play/openElevator?p=android'
-        data = json.dumps({'liveOpId':id})
+        data = json.dumps({'liveOpId':liveOpId})
         self.headers.update({
             'Authorization': token,
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                if response.status_code == 403:
+                    return None
+                    
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-        
-        return None
         
     def quit_elevator(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/play/quitAndCollect?p=android'
@@ -598,30 +570,27 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                if response.status_code == 403:
+                    return None
+                
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-        
-        return None
         
     def upgrade_boinker(self, token: str, upgrade_type: str, retries=3):
         url = f'https://boink.boinkers.co/api/boinkers/{upgrade_type}?p=android'
@@ -631,30 +600,24 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
     
     def raffle_data(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/raffle/getRafflesData?p=android'
@@ -663,30 +626,24 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.get(url, headers=self.headers, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
         
     def claim_raffle(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/raffle/claimTicketForUser?p=android'
@@ -696,30 +653,27 @@ class Boinkers:
             'Content-Type': 'application/json'
         })
 
-        attempt = 0
-        while attempt < retries:
+        for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
+                if response.status_code == 403:
+                    return None
+                
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
+                if attempt < retries - 1:
+                    print(
+                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
+                        end="\r",
+                        flush=True
+                    )
+                    time.sleep(2)
                 else:
                     return None
-            except (requests.Timeout, requests.ConnectionError) as e:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
-                    end="\r",
-                    flush=True
-                )
-            attempt += 1
-            time.sleep(2)
-
-        return None
     
     def question(self):
         while True:
@@ -740,7 +694,7 @@ class Boinkers:
         
         return collect_friends, complete_tasks
 
-    def process_query(self, query: str, collect_friends: bool, complete_tasks: bool):
+    def process_query(self, query: str, liveOpId: str, collect_friends: bool, complete_tasks: bool):
         account_name = self.extract_user_data(query)
         tokens_data = self.load_tokens()
         accounts = tokens_data.get("accounts", [])
@@ -994,8 +948,7 @@ class Boinkers:
 
                 games_energy = user['gamesEnergy']
                 if games_energy:
-                    id = self.load_liveopid()
-                    multipliers = [50, 25, 10, 5, 3, 2, 1]
+                    multipliers = [500, 150, 100, 50, 25, 10, 5, 3, 2, 1]
 
                     for game_type, details in games_energy.items():
                         if game_type in ['slotMachine', 'wheelOfFortune']:
@@ -1006,7 +959,7 @@ class Boinkers:
 
                                 for multiplier in multipliers:
                                     if energy >= multiplier:
-                                        spin = self.spin_wheel(new_token if 'new_token' in locals() else token, game_type, id, str(multiplier))
+                                        spin = self.spin_wheel(new_token if 'new_token' in locals() else token, game_type, liveOpId, str(multiplier))
                                         if spin:
                                             energy = spin['userGameEnergy']['energy']
                                             reward = spin['prize']['prizeValue']
@@ -1023,7 +976,16 @@ class Boinkers:
                                                 f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                                             )
                                             break
+
+                                        time.sleep(1)
+
                                 if not spin:
+                                    self.log(
+                                        f"{Fore.MAGENTA+Style.BRIGHT}[ Spin Wheel{Style.RESET_ALL}"
+                                        f"{Fore.WHITE+Style.BRIGHT} Type {game_type} {Style.RESET_ALL}"
+                                        f"{Fore.YELLOW+Style.BRIGHT}No Available Energy{Style.RESET_ALL}"
+                                        f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
+                                    )
                                     break
 
                             if energy == 0:
@@ -1033,8 +995,9 @@ class Boinkers:
                                     f"{Fore.YELLOW+Style.BRIGHT}No Available Energy{Style.RESET_ALL}"
                                     f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                                 )
+                            time.sleep(1)
 
-                    free_spin = self.spin_wheel(new_token if 'new_token' in locals() else token, 'WheelOfFortune', id, '1')
+                    free_spin = self.spin_wheel(new_token if 'new_token' in locals() else token, 'WheelOfFortune', liveOpId, '1')
                     if free_spin:
                         energy = free_spin['userGameEnergy']['energy']
                         reward = free_spin['prize']['prizeValue']
@@ -1063,7 +1026,7 @@ class Boinkers:
                     time.sleep(1)
 
                     while True:
-                        open = self.open_elevator(new_token if 'new_token' in locals() else token, id)
+                        open = self.open_elevator(new_token if 'new_token' in locals() else token, liveOpId)
                         if open:
                             reward = open['prize']['prizeValue']
                             reward_type = open['prize']['prizeTypeName']
@@ -1217,6 +1180,7 @@ class Boinkers:
             collect_friends, complete_tasks = self.question()
 
             while True:
+                liveOpId = self.load_liveOpId()
                 self.clear_terminal()
                 self.welcome()
                 self.log(
@@ -1227,7 +1191,7 @@ class Boinkers:
 
                 for query in queries:
                     if query:
-                        self.process_query(query, collect_friends, complete_tasks)
+                        self.process_query(query, liveOpId, collect_friends, complete_tasks)
                         self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
                         time.sleep(3)
 
