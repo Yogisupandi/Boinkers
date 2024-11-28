@@ -420,13 +420,8 @@ class Boinkers:
         for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
-                else:
-                    return None
+                response.raise_for_status()
+                return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
@@ -452,13 +447,11 @@ class Boinkers:
         for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, json=data, timeout=10)
-                if response.status_code == 200:
-                    try:
-                        return response.json()
-                    except requests.JSONDecodeError:
-                        return None
-                else:
+                if response.status_code == 403:
                     return None
+                    
+                response.raise_for_status()
+                return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
@@ -484,10 +477,8 @@ class Boinkers:
         for attempt in range(retries):
             try:
                 response = self.session.post(url, headers=self.headers, data=data, timeout=10)
-                if response.status_code == 200:
-                    return True
-                else:
-                    return False
+                response.raise_for_status()
+                return True
             except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
@@ -852,29 +843,19 @@ class Boinkers:
                 time.sleep(1)              
 
                 if complete_tasks:
+                    claimed_tasks = user['rewardedActions']
                     tasks = self.tasks(new_token if 'new_token' in locals() else token)
                     if tasks:
                         for task in tasks:
                             name_id = task['nameId']
                             reward = task['prizes'][0]['prizeValue']
                             reward_type = task['prizes'][0]['prizeTypeName']
+                            task_type = task['type']
                             delay = task['secondsToAllowClaim']
 
-                            if task is not None:
-                                if task['type'] == 'linkWithId':
-                                    continue
-                                if delay == 172800:
-                                    continue
-                                
+                            if task_type == 'watch-ad':
                                 start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
-
-                                if start is None:
-                                    continue
-
-                                started = start.get('clickDateTime', None)
-                                claimed = start.get('claimDateTime', None)
-
-                                if started and not claimed:
+                                if start:
                                     self.log(
                                         f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
                                         f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
@@ -894,10 +875,8 @@ class Boinkers:
                                         )
                                         time.sleep(1)
 
-                                    if task['type'] == 'watch-ad':
-                                        key = task['verification']['paramKey']
-                                        self.watch_ads(new_token if 'new_token' in locals() else token, key)
-
+                                    key = task['verification']['paramKey']
+                                    self.watch_ads(new_token if 'new_token' in locals() else token, key)
                                     claim = self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
                                     if claim and claim['newUserRewardedAction']['claimDateTime']:
                                         self.log(
@@ -917,13 +896,65 @@ class Boinkers:
                                         )
                                     time.sleep(1)
 
-                                elif started and claimed:
-                                    self.log(
-                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                        f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
-                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                    )
+                            else:
+                                if name_id in claimed_tasks.keys():
+                                    continue
+
+                                if task_type == 'linkWithId' or delay == 172800:
+                                    continue
+
+                                start = self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
+                                if start:
+                                    started = start.get('clickDateTime', None)
+                                    claimed = start.get('claimDateTime', None)
+
+                                    if started and not claimed:
+                                        self.log(
+                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                            f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                            f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
+                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                        )
+                                        for remaining in range(delay, 0, -1):
+                                            print(
+                                                f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                                                f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                                                f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
+                                                f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
+                                                f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
+                                                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
+                                                end="\r",
+                                                flush=True
+                                            )
+                                            time.sleep(1)
+
+                                        claim = self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
+                                        if claim and claim['newUserRewardedAction']['claimDateTime']:
+                                            self.log(
+                                                f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                                f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                                f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                                                f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                                                f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
+                                                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                            )
+                                        else:
+                                            self.log(
+                                                f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                                f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                                f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
+                                                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
+                                            )
+                                        time.sleep(1)
+
+                                    elif started and claimed:
+                                        self.log(
+                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                                            f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                                            f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
+                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                                        )
+
                                 else:
                                     self.log(
                                         f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
