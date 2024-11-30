@@ -844,7 +844,10 @@ class Boinkers:
                 time.sleep(1)              
 
                 if complete_tasks:
-                    claimed_tasks = user['rewardedActions']
+                    claimed_tasks = user.get('rewardedActions', {})
+                    if not isinstance(claimed_tasks, dict):
+                        claimed_tasks = {}
+                        
                     tasks = self.tasks(new_token if 'new_token' in locals() else token)
                     if tasks:
                         for task in tasks:
