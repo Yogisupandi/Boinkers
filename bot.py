@@ -1,4 +1,5 @@
 import requests
+import cloudscraper
 import json
 import os
 from urllib.parse import parse_qs, unquote
@@ -11,7 +12,7 @@ wib = pytz.timezone('Asia/Jakarta')
 
 class Boinkers:
     def __init__(self) -> None:
-        self.session = requests.Session()
+        self.scraper = cloudscraper.create_scraper()
         self.headers = {
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -115,7 +116,7 @@ class Boinkers:
                     self.log(
                         f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
                         f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT}Query Is Expired{Style.RESET_ALL}"
+                        f"{Fore.YELLOW + Style.BRIGHT}Blocked By Cloudflare{Style.RESET_ALL}"
                         f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
                         f"{Fore.RED + Style.BRIGHT} Failed to Generate Token {Style.RESET_ALL}"
                         f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
@@ -167,7 +168,7 @@ class Boinkers:
                         self.log(
                             f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
                             f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                            f"{Fore.YELLOW + Style.BRIGHT}Query Is Expired{Style.RESET_ALL}"
+                            f"{Fore.YELLOW + Style.BRIGHT}Blocked By Cloudflare{Style.RESET_ALL}"
                             f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
                             f"{Fore.RED + Style.BRIGHT} Failed to Generate Token {Style.RESET_ALL}"
                             f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
@@ -197,7 +198,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.get(url, headers=self.headers, timeout=10)
+                response = self.scraper.get(url, headers=self.headers, timeout=10)
                 response.raise_for_status()
                 return response.json()['liveOps'][0]['_id']
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -223,7 +224,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, data=data, timeout=10)
                 response.raise_for_status()
                 return response.json()['token']
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -231,7 +232,7 @@ class Boinkers:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
                         f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.RED + Style.BRIGHT}Request Timeout.{Style.RESET_ALL}"
+                        f"{Fore.RED + Style.BRIGHT}HTTP ERROR{Style.RESET_ALL}"
                         f"{Fore.WHITE + Style.BRIGHT} Retrying {attempt+1}/{retries} {Style.RESET_ALL}",
                         end="\r",
                         flush=True
@@ -249,7 +250,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.get(url, headers=self.headers, timeout=10)
+                response = self.scraper.get(url, headers=self.headers, timeout=10)
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -276,7 +277,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, data=data, timeout=10)
                 if response.status_code == 403:
                     return False
                 
@@ -306,7 +307,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, data=data, timeout=10)
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -333,7 +334,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 403:
                     return None
                 
@@ -363,7 +364,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 403:
                     return None
                 
@@ -392,7 +393,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.get(url, headers=self.headers, timeout=10)
+                response = self.scraper.get(url, headers=self.headers, timeout=10)
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -419,7 +420,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -446,7 +447,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 403:
                     return None
                     
@@ -476,7 +477,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, data=data, timeout=10)
                 response.raise_for_status()
                 return True
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -503,7 +504,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, data=data, timeout=10)
                 if response.status_code == 403:
                     return None
                     
@@ -533,7 +534,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, data=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, data=data, timeout=10)
                 if response.status_code == 403:
                     return None
                     
@@ -563,7 +564,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 403:
                     return None
                 
@@ -593,7 +594,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -619,7 +620,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.get(url, headers=self.headers, timeout=10)
+                response = self.scraper.get(url, headers=self.headers, timeout=10)
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, requests.Timeout, ValueError) as e:
@@ -646,7 +647,7 @@ class Boinkers:
 
         for attempt in range(retries):
             try:
-                response = self.session.post(url, headers=self.headers, json=data, timeout=10)
+                response = self.scraper.post(url, headers=self.headers, json=data, timeout=10)
                 if response.status_code == 403:
                     return None
                 
