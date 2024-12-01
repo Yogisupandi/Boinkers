@@ -1,4 +1,3 @@
-requests
-cloudscraper
+aiohttp
 colorama
 pytz
