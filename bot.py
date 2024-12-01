@@ -1061,7 +1061,8 @@ class Boinkers:
                     )
                 await asyncio.sleep(1)
 
-                games_energy = await self.users_me(new_token if 'new_token' in locals() else token)['gamesEnergy']
+                user = await self.users_me(new_token if 'new_token' in locals() else token)
+                games_energy = user['gamesEnergy']
                 if games_energy:
                     multipliers = [500, 150, 100, 50, 25, 10, 5, 3, 2, 1]
 
