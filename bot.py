@@ -1,18 +1,18 @@
-from aiohttp import (
-    ClientResponseError,
-    ClientSession,
-    ClientTimeout
-)
+import requests
+import cloudscraper
+import json
+import os
 from colorama import *
-from datetime import datetime, timedelta
-from urllib.parse import parse_qs, unquote
+from datetime import datetime
 from fake_useragent import FakeUserAgent
-import asyncio, json, os, pytz
+import time
+import pytz
 
 wib = pytz.timezone('Asia/Jakarta')
 
 class Boinkers:
     def __init__(self) -> None:
+        self.scraper = cloudscraper.create_scraper()
         self.headers = {
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -20,12 +20,12 @@ class Boinkers:
             'Host': 'boink.boinkers.co',
             'Origin': 'https://boink.boinkers.co',
             'Pragma': 'no-cache',
+            'Referer': 'https://boink.boinkers.co/sluts',
             'Sec-Fetch-Dest': 'empty',
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Site': 'same-origin',
             'User-Agent': FakeUserAgent().random
         }
-        self.token_file = 'tokens.json'
 
     def clear_terminal(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -51,160 +51,22 @@ class Boinkers:
         hours, remainder = divmod(seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
-
-    def extract_user_data(self, query: str) -> str:
-        parsed_query = parse_qs(query)
-        user_data = parsed_query.get('user', [None])[0]
-
-        if user_data:
-            user_json = json.loads(unquote(user_data))
-            return str(user_json.get('first_name', 'Unknown'))
-        return 'Unknown'
-
-    def load_tokens(self):
-        try:
-            if not os.path.exists('tokens.json'):
-                return {"accounts": []}
-
-            with open('tokens.json', 'r') as file:
-                data = json.load(file)
-                if "accounts" not in data:
-                    return {"accounts": []}
-                return data
-        except json.JSONDecodeError:
-            return {"accounts": []}
-
-    def save_tokens(self, tokens):
-        with open('tokens.json', 'w') as file:
-            json.dump(tokens, file, indent=4)
-
-    def load_queries(self):
-        with open('query.txt', 'r') as file:
-            return [line.strip() for line in file if line.strip()]
-
-    async def generate_tokens(self, queries: list):
-        tokens_data = self.load_tokens()
-        accounts = tokens_data["accounts"]
-
-        for idx, query in enumerate(queries):
-            account_name = self.extract_user_data(query)
-
-            existing_account = next((acc for acc in accounts if acc["first_name"] == account_name), None)
-
-            if not existing_account:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                    f"{Fore.YELLOW + Style.BRIGHT}Token Is None{Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
-                    f"{Fore.YELLOW + Style.BRIGHT} Generating Token... {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}",
-                    end="\r", flush=True
-                )
-                await asyncio.sleep(1)
-
-                token = await self.users_login(query)
-                if token:
-                    self.log(
-                        f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT}] [{Style.RESET_ALL}"
-                        f"{Fore.GREEN + Style.BRIGHT} Successfully Generated Token {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
-                    )
-                    accounts.insert(idx, {"first_name": account_name, "token": token})
-                else:
-                    self.log(
-                        f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT}Blocked By Cloudflare{Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
-                        f"{Fore.RED + Style.BRIGHT} Failed to Generate Token {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
-                    )
-
-                await asyncio.sleep(1)
-                self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}" * 75)
-
-        self.save_tokens({"accounts": accounts})
-
-    async def renew_token(self, account_name):
-        tokens_data = self.load_tokens()
-        accounts = tokens_data.get("accounts", [])
-        
-        account = next((acc for acc in accounts if acc["first_name"] == account_name), None)
-        
-        if account and "token" in account:
-            token = account["token"]
-            user_data = await self.users_me(token)
-            if not user_data:
-                print(
-                    f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT}Token Isn't Valid{Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
-                    f"{Fore.YELLOW + Style.BRIGHT} Regenerating Token... {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}",
-                    end="\r", flush=True
-                )
-                await asyncio.sleep(1)
-                
-                accounts = [acc for acc in accounts if acc["first_name"] != account_name]
-                
-                query = next((query for query in self.load_queries() if self.extract_user_data(query) == account_name), None)
-                if query:
-                    new_token = await self.users_login(query)
-                    if new_token:
-                        accounts.append({"first_name": account_name, "token": new_token})
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                            f"{Fore.GREEN + Style.BRIGHT}Query Is Valid{Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
-                            f"{Fore.GREEN + Style.BRIGHT} Successfully Generated Token {Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
-                        )
-                    else:
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                            f"{Fore.YELLOW + Style.BRIGHT}Blocked By Cloudflare{Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT} ] [{Style.RESET_ALL}"
-                            f"{Fore.RED + Style.BRIGHT} Failed to Generate Token {Style.RESET_ALL}"
-                            f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
-                        )
-                else:
-                    self.log(
-                        f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT}] [{Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT} Query Is None. Skipping {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}                           "
-                    )
-
-                await asyncio.sleep(1)
-        
-        self.save_tokens({"accounts": accounts})
-        
-    async def load_liveOpId(self, retries=3):
+    
+    def load_liveOpId(self, retries=3):
         url = 'https://boink.boinkers.co/public/data/config?p=android'
         headers = {
             **self.headers,
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.get(url=url, headers=headers, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result['liveOps'][0]['_id']
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.get(url, headers=headers, timeout=10)
+                if response.status_code == 403:
+                    return None
+
+                response.raise_for_status()
+                return response.json()['liveOps'][0]['_id']
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -215,27 +77,23 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
 
-    async def users_login(self, query: str, retries=3):
+    def users_login(self, query: str, retries=3):
         url = 'https://boink.boinkers.co/public/users/loginByTelegram?tgWebAppStartParam=boink1493482017&p=android'
         data = json.dumps({"initDataString":query, "sessionParams":{}})
         headers = {
             **self.headers,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result['token']
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, data=data, timeout=10)
+                response.raise_for_status()
+                return response.json()['token']
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -246,26 +104,23 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
         
-    async def users_me(self, token: str, retries=3):
+    def users_me(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/users/me?p=android'
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.get(url=url, headers=headers, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -276,31 +131,27 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
-                
-    async def claim_booster(self, token: str, retries=3):
+        
+    def claim_booster(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/boinkers/addShitBooster?p=android'
         data = json.dumps({'multiplier':2, 'optionNumber':1})
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, data=data, timeout=10)
+                if response.status_code == 403:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -311,28 +162,24 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
 
-    async def claim_inbox(self, token: str, message_id: str, retries=3):
+    def claim_inbox(self, token: str, message_id: str, retries=3):
         url = 'https://boink.boinkers.co/api/inboxMessages/claimInboxMessagePrize?p=android'
         data = json.dumps({'inboxMessageId':message_id})
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, data=data, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -343,31 +190,27 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
 
-    async def collect_friends(self, token: str, friend_id: str, retries=3):
+    def collect_friends(self, token: str, friend_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/friends/claimFriendMoonBoinkerReward/{friend_id}?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/friends'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+                if response.status_code in [403, 429]:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -378,31 +221,27 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
 
-    async def push_friends(self, token: str, friend_id: str, retries=3):
+    def push_friends(self, token: str, friend_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/friends/pushFriendToPlay/{friend_id}?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/friends'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+                if response.status_code in [403, 429]:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -413,26 +252,23 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
         
-    async def tasks(self, token: str, retries=3):
+    def tasks(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/rewardedActions/getRewardedActionList?p=android'
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.get(url=url, headers=headers, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -443,129 +279,78 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
         
-    async def start_tasks(self, token: str, name_id: str, retries=3):
+    def start_tasks(self, token: str, name_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/rewardedActions/rewardedActionClicked/{name_id}?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
-        for attempt in range(retries):
-            try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
-                if attempt < retries - 1:
-                    print(
-                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.RED + Style.BRIGHT}[ ERROR ]{Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT}{attempt+1}/{retries}{Style.RESET_ALL}",
-                        end="\r",
-                        flush=True
-                    )
-                    await asyncio.sleep(2)
-                else:
-                    return None
+
+        try:
+            response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except (requests.RequestException, requests.Timeout, ValueError) as e:
+            self.log(f"{Fore.RED + Style.BRIGHT}Error While Start Tasks: {str(e)}{Style.RESET_ALL}")
+            return None
         
-    async def claim_tasks(self, token: str, name_id: str, retries=3):
+    def claim_tasks(self, token: str, name_id: str, retries=3):
         url = f'https://boink.boinkers.co/api/rewardedActions/claimRewardedAction/{name_id}?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
-        for attempt in range(retries):
-            try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
-                if attempt < retries - 1:
-                    print(
-                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.RED + Style.BRIGHT}[ ERROR ]{Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT}{attempt+1}/{retries}{Style.RESET_ALL}",
-                        end="\r",
-                        flush=True
-                    )
-                    await asyncio.sleep(2)
-                else:
-                    return None
+
+        try:
+            response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except (requests.RequestException, requests.Timeout, ValueError) as e:
+            self.log(f"{Fore.RED + Style.BRIGHT}Error While Claim Tasks: {str(e)}{Style.RESET_ALL}")
+            return None
         
-    async def watch_ads(self, token: str, key: str, retries=3):
+    def watch_ads(self, token: str, key: str, retries=3):
         url = 'https://boink.boinkers.co/api/rewardedActions/ad-watched?p=android'
         data = json.dumps({'adsForSpins':False, 'providerId':key})
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
-        for attempt in range(retries):
-            try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        response.raise_for_status()
-                        return True
-            except (Exception, ClientResponseError) as e:
-                if attempt < retries - 1:
-                    print(
-                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.RED + Style.BRIGHT}[ ERROR ]{Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT} Retrying... {Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT}{attempt+1}/{retries}{Style.RESET_ALL}",
-                        end="\r",
-                        flush=True
-                    )
-                    await asyncio.sleep(2)
-                else:
-                    return None
+
+        try:
+            response = self.scraper.post(url, headers=headers, data=data, timeout=10)
+            response.raise_for_status()
+            return True
+        except (requests.RequestException, requests.Timeout, ValueError) as e:
+            self.log(f"{Fore.RED + Style.BRIGHT}Error While Watch Ads: {str(e)}{Style.RESET_ALL}")
+            return None
         
-    async def spin_wheel(self, token: str, game_type: str, liveOpId: str, multiplier: str, retries=3):
+    def spin_wheel(self, token: str, game_type: str, liveOpId: str, multiplier: str, retries=3):
         url = f'https://boink.boinkers.co/api/play/spin{game_type.capitalize()}/{multiplier}?p=android'
         data = json.dumps({'liveOpId':liveOpId} if liveOpId else {})
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, data=data, timeout=10)
+                if response.status_code == 403:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -576,31 +361,27 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
     
-    async def open_elevator(self, token: str, liveOpId: str, retries=3):
+    def open_elevator(self, token: str, liveOpId: str, retries=3):
         url = 'https://boink.boinkers.co/api/play/openElevator?p=android'
         data = json.dumps({'liveOpId':liveOpId})
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, data=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, data=data, timeout=10)
+                if response.status_code == 403:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -611,31 +392,27 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
         
-    async def quit_elevator(self, token: str, retries=3):
+    def quit_elevator(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/play/quitAndCollect?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+                if response.status_code == 403:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -646,28 +423,24 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
         
-    async def upgrade_boinker(self, token: str, upgrade_type: str, retries=3):
+    def upgrade_boinker(self, token: str, upgrade_type: str, retries=3):
         url = f'https://boink.boinkers.co/api/boinkers/{upgrade_type}?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/sluts'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -678,26 +451,23 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
     
-    async def raffle_data(self, token: str, retries=3):
+    def raffle_data(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/raffle/getRafflesData?p=android'
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.get(url=url, headers=headers, ssl=False) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -708,31 +478,27 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
         
-    async def claim_raffle(self, token: str, retries=3):
+    def claim_raffle(self, token: str, retries=3):
         url = 'https://boink.boinkers.co/api/raffle/claimTicketForUser?p=android'
         data = {}
         headers = {
             **self.headers,
             'Authorization': token,
-            'Content-Length': str(len(data)),
-            'Content-Type': 'application/json',
-            'Referer': 'https://boink.boinkers.co/earn'
+            'Content-Type': 'application/json'
         }
         for attempt in range(retries):
             try:
-                async with ClientSession(timeout=ClientTimeout(total=20)) as session:
-                    async with session.post(url=url, headers=headers, json=data, ssl=False) as response:
-                        if response.status == 403:
-                            return None
-                        
-                        response.raise_for_status()
-                        result = await response.json()
-                        return result
-            except (Exception, ClientResponseError) as e:
+                response = self.scraper.post(url, headers=headers, json=data, timeout=10)
+                if response.status_code == 403:
+                    return None
+
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, requests.Timeout, ValueError) as e:
                 if attempt < retries - 1:
                     print(
                         f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -743,7 +509,7 @@ class Boinkers:
                         end="\r",
                         flush=True
                     )
-                    await asyncio.sleep(2)
+                    time.sleep(2)
                 else:
                     return None
     
@@ -756,43 +522,28 @@ class Boinkers:
             else:
                 print(f"{Fore.RED+Style.BRIGHT}Invalid Input.{Fore.WHITE+Style.BRIGHT} Choose 'y' to push & collect or 'n' to skip.{Style.RESET_ALL}")
         
-        while True:
-            complete_tasks = input("Auto Complete Tasks? [y/n] -> ").strip().lower()
-            if complete_tasks in ["y", "n"]:
-                complete_tasks = complete_tasks == "y"
-                break
-            else:
-                print(f"{Fore.RED+Style.BRIGHT}Invalid Input.{Fore.WHITE+Style.BRIGHT} Choose 'y' to complete or 'n' to skip.{Style.RESET_ALL}")
+        # while True:
+        #     complete_tasks = input("Auto Complete Tasks? [y/n] -> ").strip().lower()
+        #     if complete_tasks in ["y", "n"]:
+        #         complete_tasks = complete_tasks == "y"
+        #         break
+        #     else:
+        #         print(f"{Fore.RED+Style.BRIGHT}Invalid Input.{Fore.WHITE+Style.BRIGHT} Choose 'y' to complete or 'n' to skip.{Style.RESET_ALL}")
         
-        return collect_friends, complete_tasks
+        return collect_friends
         
-    async def process_query(self, query: str, liveOpId: str, collect_friends: bool, complete_tasks: bool):
-        account_name = self.extract_user_data(query)
-        tokens_data = self.load_tokens()
-        accounts = tokens_data.get("accounts", [])
-        exist_account = next((acc for acc in accounts if acc["first_name"] == account_name), None)
-        if not exist_account:
+    def process_query(self, query: str, liveOpId: str, collect_friends: bool):
+        token = self.users_login(query)
+        if not token:
             self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {account_name} {Style.RESET_ALL}"
-                f"{Fore.RED + Style.BRIGHT}Token Not Found in tokens.json{Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                f"{Fore.MAGENTA+Style.BRIGHT}[ Account{Style.RESET_ALL}"
+                f"{Fore.RED+Style.BRIGHT} Query Id Isn't Valid {Style.RESET_ALL}"
+                f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
             )
             return
         
-        if exist_account and "token" in exist_account:
-            token = exist_account["token"]
-
-            user = await self.users_me(token)
-            if not user:
-                await self.renew_token(account_name)
-                tokens_data = self.load_tokens()
-                new_account = next((acc for acc in tokens_data["accounts"] if acc["first_name"] == account_name), None)
-                
-                if new_account and "token" in new_account:
-                    new_token = new_account["token"] 
-                    user = await self.users_me(new_token)
-
+        if token:
+            user = self.users_me(token)
             if user:
                 gold = user.get('currencySoft', 0)
                 shit = user.get('currencyCrypto', 0)
@@ -805,9 +556,9 @@ class Boinkers:
                     f"{Fore.WHITE+Style.BRIGHT} {shit:.4f} 💩 {Style.RESET_ALL}"
                     f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                 )
-                await asyncio.sleep(1)
+                time.sleep(1)
 
-                claim_booster = await self.claim_booster(new_token if 'new_token' in locals() else token)
+                claim_booster = self.claim_booster(token)
                 if claim_booster:
                     self.log(
                         f"{Fore.MAGENTA+Style.BRIGHT}[ Boost Mining{Style.RESET_ALL}"
@@ -820,7 +571,7 @@ class Boinkers:
                         f"{Fore.YELLOW+Style.BRIGHT} Is Already Claimed {Style.RESET_ALL}"
                         f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                await asyncio.sleep(1)
+                time.sleep(1)
 
                 inbox = user['inboxMessages']
                 if inbox:
@@ -830,7 +581,7 @@ class Boinkers:
                         status = message['state']
 
                         if message and status != "claimed":
-                            claim_inbox = await self.claim_inbox(new_token if 'new_token' in locals() else token, message_id)
+                            claim_inbox = self.claim_inbox(token, message_id)
                             if claim_inbox:
                                 reward = claim_inbox['gottenPrize']['prizeValue']
                                 reward_type = claim_inbox.get('gottenPrize', {}).get('prizeName', 'Gold')
@@ -864,16 +615,16 @@ class Boinkers:
                         f"{Fore.YELLOW+Style.BRIGHT} No Available Message {Style.RESET_ALL}"
                         f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                await asyncio.sleep(1)
+                time.sleep(1)
 
                 if collect_friends:
-                    friends = user['friendsInvited']
+                    friends = user['friends']
                     if friends:
                         for friend in friends:
                             friend_id = friend['_id']
 
                             if friend is not None:
-                                collect = await self.collect_friends(new_token if 'new_token' in locals() else token, friend_id)
+                                collect = self.collect_friends(token, friend_id)
                                 if collect and collect['invitedFriendsData']:
                                     self.log(
                                         f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
@@ -890,9 +641,9 @@ class Boinkers:
                                         f"{Fore.YELLOW+Style.BRIGHT}No Availabe Reward to Claim{Style.RESET_ALL}"
                                         f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                                     )
-                                await asyncio.sleep(1)
+                                time.sleep(1)
 
-                                push = await self.push_friends(new_token if 'new_token' in locals() else token, friend_id)
+                                push = self.push_friends(token, friend_id)
                                 if push and push['invitedFriendsData']:
                                     self.log(
                                         f"{Fore.MAGENTA+Style.BRIGHT}[ Friend{Style.RESET_ALL}"
@@ -907,7 +658,7 @@ class Boinkers:
                                         f"{Fore.YELLOW+Style.BRIGHT}Not Time to Push{Style.RESET_ALL}"
                                         f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                                     )
-                                await asyncio.sleep(1)
+                                time.sleep(1)
 
                     else:
                         self.log(
@@ -921,147 +672,146 @@ class Boinkers:
                         f"{Fore.YELLOW+Style.BRIGHT} Push & Collect Is Skipped {Style.RESET_ALL}"
                         f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                await asyncio.sleep(1)              
+                time.sleep(1)              
 
-                if complete_tasks:
-                    claimed_tasks = user.get('rewardedActions', {})
-                    if not isinstance(claimed_tasks, dict):
-                        claimed_tasks = {}
+                # if complete_tasks:
+                #     claimed_tasks = user.get('rewardedActions', {})
+                #     if not isinstance(claimed_tasks, dict):
+                #         claimed_tasks = {}
                         
-                    tasks = await self.tasks(new_token if 'new_token' in locals() else token)
-                    if tasks:
-                        for task in tasks:
-                            name_id = task['nameId']
-                            reward = task['prizes'][0]['prizeValue']
-                            reward_type = task['prizes'][0]['prizeTypeName']
-                            task_type = task['type']
-                            delay = task['secondsToAllowClaim']
+                #     tasks = self.tasks(token)
+                #     if tasks:
+                #         for task in tasks:
+                #             name_id = task['nameId']
+                #             reward = task['prizes'][0]['prizeValue']
+                #             reward_type = task['prizes'][0]['prizeTypeName']
+                #             task_type = task['type']
+                #             delay = task['secondsToAllowClaim']
 
-                            if task_type == 'watch-ad':
-                                start = await self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
-                                if start:
-                                    self.log(
-                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                        f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
-                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                    )
-                                    for remaining in range(delay, 0, -1):
-                                        print(
-                                            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
-                                            f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
-                                            end="\r",
-                                            flush=True
-                                        )
-                                        await asyncio.sleep(1)
+                #             if task_type == 'watch-ad':
+                #                 start = self.start_tasks(token, name_id)
+                #                 if start:
+                #                     self.log(
+                #                         f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                         f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                         f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
+                #                         f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                #                     )
+                #                     for remaining in range(delay, 0, -1):
+                #                         print(
+                #                             f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
+                #                             f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
+                #                             end="\r",
+                #                             flush=True
+                #                         )
+                #                         time.sleep(1)
 
-                                    key = task['verification']['paramKey']
-                                    await self.watch_ads(new_token if 'new_token' in locals() else token, key)
-                                    claim = await self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
-                                    if claim and claim['newUserRewardedAction']['claimDateTime']:
-                                        self.log(
-                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                            f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                        )
-                                    else:
-                                        self.log(
-                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                            f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
-                                        )
-                                    await asyncio.sleep(1)
+                #                     key = task['verification']['paramKey']
+                #                     self.watch_ads(token, key)
+                #                     claim = self.claim_tasks(token, name_id)
+                #                     if claim and claim['newUserRewardedAction']['claimDateTime']:
+                #                         self.log(
+                #                             f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                             f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                #                         )
+                #                     else:
+                #                         self.log(
+                #                             f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                             f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
+                #                         )
+                #                     time.sleep(1)
 
-                            else:
-                                if name_id in claimed_tasks.keys():
-                                    continue
+                #             else:
+                #                 if name_id in claimed_tasks.keys():
+                #                     continue
 
-                                if task_type == 'linkWithId' or delay == 172800:
-                                    continue
+                #                 if task_type == 'linkWithId' or delay == 172800:
+                #                     continue
 
-                                start = await self.start_tasks(new_token if 'new_token' in locals() else token, name_id)
-                                if start:
-                                    started = start.get('clickDateTime', None)
-                                    claimed = start.get('claimDateTime', None)
+                #                 start = self.start_tasks(token, name_id)
+                #                 if start:
+                #                     started = start.get('clickDateTime', None)
+                #                     claimed = start.get('claimDateTime', None)
 
-                                    if started and not claimed:
-                                        self.log(
-                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                            f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                        )
-                                        for remaining in range(delay, 0, -1):
-                                            print(
-                                                f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                                                f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                                                f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
-                                                f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
-                                                f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
-                                                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
-                                                end="\r",
-                                                flush=True
-                                            )
-                                            await asyncio.sleep(1)
+                #                     if started and not claimed:
+                #                         self.log(
+                #                             f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                             f"{Fore.GREEN + Style.BRIGHT}Is Started{Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                #                         )
+                #                         for remaining in range(delay, 0, -1):
+                #                             print(
+                #                                 f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                #                                 f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
+                #                                 f"{Fore.YELLOW + Style.BRIGHT} {remaining} {Style.RESET_ALL}"
+                #                                 f"{Fore.WHITE + Style.BRIGHT}Seconds to Claim Reward{Style.RESET_ALL}"
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}   ",
+                #                                 end="\r",
+                #                                 flush=True
+                #                             )
+                #                             time.sleep(1)
 
-                                        claim = await self.claim_tasks(new_token if 'new_token' in locals() else token, name_id)
-                                        if claim and claim['newUserRewardedAction']['claimDateTime']:
-                                            self.log(
-                                                f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                                f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                                f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
-                                                f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
-                                                f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
-                                                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                            )
-                                        else:
-                                            self.log(
-                                                f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                                f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                                f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
-                                                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
-                                            )
-                                        await asyncio.sleep(1)
+                #                         claim = self.claim_tasks(token, name_id)
+                #                         if claim and claim['newUserRewardedAction']['claimDateTime']:
+                #                             self.log(
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                                 f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                                 f"{Fore.GREEN + Style.BRIGHT}Is Claimed{Style.RESET_ALL}"
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
+                #                                 f"{Fore.WHITE + Style.BRIGHT} {reward} {reward_type} {Style.RESET_ALL}"
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                #                             )
+                #                         else:
+                #                             self.log(
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                                 f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                                 f"{Fore.RED + Style.BRIGHT}Isn't Claimed{Style.RESET_ALL}"
+                #                                 f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}            "
+                #                             )
+                #                         time.sleep(1)
 
-                                    elif started and claimed:
-                                        self.log(
-                                            f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                            f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                            f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
-                                            f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                        )
+                #                     elif started and claimed:
+                #                         self.log(
+                #                             f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                             f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                             f"{Fore.YELLOW + Style.BRIGHT}Is Already Claimed{Style.RESET_ALL}"
+                #                             f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                #                         )
 
-                                else:
-                                    self.log(
-                                        f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                                        f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
-                                        f"{Fore.RED + Style.BRIGHT}Isn't Started{Style.RESET_ALL}"
-                                        f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-                                    )
+                #                 else:
+                #                     self.log(
+                #                         f"{Fore.MAGENTA + Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #                         f"{Fore.WHITE + Style.BRIGHT} {task['text']} {Style.RESET_ALL}"
+                #                         f"{Fore.RED + Style.BRIGHT}Isn't Started{Style.RESET_ALL}"
+                #                         f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                #                     )
 
-                    else:
-                        self.log(
-                            f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                            f"{Fore.RED+Style.BRIGHT} Data Is None {Style.RESET_ALL}"
-                            f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
-                        )
-                else:
-                    self.log(
-                        f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
-                        f"{Fore.YELLOW+Style.BRIGHT} Completion is Skipped {Style.RESET_ALL}"
-                        f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
-                    )
-                await asyncio.sleep(1)
+                #     else:
+                #         self.log(
+                #             f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #             f"{Fore.RED+Style.BRIGHT} Data Is None {Style.RESET_ALL}"
+                #             f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                #         )
+                # else:
+                #     self.log(
+                #         f"{Fore.MAGENTA+Style.BRIGHT}[ Tasks{Style.RESET_ALL}"
+                #         f"{Fore.YELLOW+Style.BRIGHT} Completion is Skipped {Style.RESET_ALL}"
+                #         f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                #     )
+                # time.sleep(1)
 
-                user = await self.users_me(new_token if 'new_token' in locals() else token)
                 games_energy = user['gamesEnergy']
                 if games_energy:
                     multipliers = [500, 150, 100, 50, 25, 10, 5, 3, 2, 1]
@@ -1075,7 +825,7 @@ class Boinkers:
 
                                 for multiplier in multipliers:
                                     if energy >= multiplier:
-                                        spin = await self.spin_wheel(new_token if 'new_token' in locals() else token, game_type, liveOpId, str(multiplier))
+                                        spin = self.spin_wheel(token, game_type, liveOpId, str(multiplier))
                                         if spin:
                                             energy = spin['userGameEnergy']['energy']
                                             reward = spin['prize']['prizeValue']
@@ -1093,7 +843,7 @@ class Boinkers:
                                             )
                                             break
 
-                                        await asyncio.sleep(1)
+                                        time.sleep(2)
 
                                 if not spin:
                                     self.log(
@@ -1111,9 +861,9 @@ class Boinkers:
                                     f"{Fore.YELLOW+Style.BRIGHT}No Available Energy{Style.RESET_ALL}"
                                     f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                                 )
-                            await asyncio.sleep(1)
+                            time.sleep(1)
 
-                    free_spin = await self.spin_wheel(new_token if 'new_token' in locals() else token, 'WheelOfFortune', liveOpId, '1')
+                    free_spin = self.spin_wheel(token, 'WheelOfFortune', liveOpId, '1')
                     if free_spin:
                         energy = free_spin['userGameEnergy']['energy']
                         reward = free_spin['prize']['prizeValue']
@@ -1139,10 +889,10 @@ class Boinkers:
                             f"{Fore.YELLOW+Style.BRIGHT}Not Available{Style.RESET_ALL}"
                             f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                         )
-                    await asyncio.sleep(1)
+                    time.sleep(1)
 
                     while True:
-                        open = await self.open_elevator(new_token if 'new_token' in locals() else token, liveOpId)
+                        open = self.open_elevator(token, liveOpId)
                         if open:
                             reward = open['prize']['prizeValue']
                             reward_type = open['prize']['prizeTypeName']
@@ -1162,11 +912,12 @@ class Boinkers:
                                 f"{Fore.YELLOW+Style.BRIGHT} No Available Attempt {Style.RESET_ALL}"
                                 f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                             )
-                            await asyncio.sleep(1)
-
-                            await self.quit_elevator(new_token if 'new_token' in locals() else token)
-
                             break
+
+                        time.sleep(2)
+
+                    if not open:
+                        self.quit_elevator(token)
 
                 else:
                     self.log(
@@ -1174,7 +925,7 @@ class Boinkers:
                         f"{Fore.RED+Style.BRIGHT} Data Is None {Style.RESET_ALL}"\
                         f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                     )
-                await asyncio.sleep(1)
+                time.sleep(1)
 
                 boinkers = user['boinkers']
                 if boinkers:
@@ -1185,12 +936,12 @@ class Boinkers:
                         f"{Fore.WHITE+Style.BRIGHT} Level {boinkers['currentBoinkerProgression']['level']} {Style.RESET_ALL}"
                         f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                     )
-                    await asyncio.sleep(1)
+                    time.sleep(1)
 
                     upgrade_type = ['megaUpgradeBoinkers', 'upgradeBoinker']
                     while True:
                         for upgrade in upgrade_type:
-                            upgrade_boinker = await self.upgrade_boinker(new_token if 'new_token' in locals() else token, upgrade_type=upgrade)
+                            upgrade_boinker = self.upgrade_boinker(token, upgrade_type=upgrade)
                             
                             if upgrade_boinker:
                                 id = upgrade_boinker['userBoinkers']['currentBoinkerProgression']['id']
@@ -1228,7 +979,7 @@ class Boinkers:
 
                                 break
                             
-                            await asyncio.sleep(1)
+                            time.sleep(1)
 
                         else:
                             continue
@@ -1241,9 +992,9 @@ class Boinkers:
                         f"{Fore.RED+Style.BRIGHT} Data Is None {Style.RESET_ALL}"
                         f"{Fore.MAGENTA+Style.BRIGHT} ]{Style.RESET_ALL}"
                     )
-                await asyncio.sleep(1)
+                time.sleep(1)
 
-                raffle = await self.raffle_data(new_token if 'new_token' in locals() else token)
+                raffle = self.raffle_data(token)
                 if raffle:
                     raffle_id = raffle.get('userRaffleData', {}).get('raffleId', None)
                     milestone = raffle.get('userRaffleData', {}).get('milestoneReached', 0)
@@ -1257,10 +1008,10 @@ class Boinkers:
                         f"{Fore.WHITE+Style.BRIGHT} {ticket} Ticket {Style.RESET_ALL}"
                         f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                     )
-                    await asyncio.sleep(1)
+                    time.sleep(1)
 
                     while True:
-                        claim = await self.claim_raffle(new_token if 'new_token' in locals() else token)
+                        claim = self.claim_raffle(token)
                         if claim:
                             self.log(
                                 f"{Fore.MAGENTA+Style.BRIGHT}[ Raffle{Style.RESET_ALL}"
@@ -1287,17 +1038,34 @@ class Boinkers:
                         f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
                     )
 
-    async def main(self):
-        self.clear_terminal()
-        try:
-            queries = self.load_queries()
-            await self.generate_tokens(queries)
+            else:
+                self.log(
+                    f"{Fore.MAGENTA+Style.BRIGHT}[ Account{Style.RESET_ALL}"
+                    f"{Fore.RED+Style.BRIGHT} Data Is None {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                )
 
-            collect_friends, complete_tasks = self.question()
+    def main(self):
+        try:
+            with open('query.txt', 'r') as file:
+                queries = [line.strip() for line in file if line.strip()]
+
+            collect_friends = self.question()
 
             while True:
-                liveOpId = await self.load_liveOpId()
                 self.clear_terminal()
+
+                liveOpId = self.load_liveOpId()
+                if not liveOpId:
+                    self.log(
+                        f"{Fore.MAGENTA+Style.BRIGHT}[ Boinkers{Style.RESET_ALL}"
+                        f"{Fore.YELLOW+Style.BRIGHT} Blocked By Cloudflare {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
+                        f"{Fore.WHITE+Style.BRIGHT} Restart Again {Style.RESET_ALL}"
+                        f"{Fore.MAGENTA+Style.BRIGHT}]{Style.RESET_ALL}"
+                    )
+                    return
+
                 self.welcome()
                 self.log(
                     f"{Fore.GREEN + Style.BRIGHT}Account's Total: {Style.RESET_ALL}"
@@ -1306,10 +1074,11 @@ class Boinkers:
                 self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
 
                 for query in queries:
+                    query = query.strip()
                     if query:
-                        await self.process_query(query, liveOpId, collect_friends, complete_tasks)
+                        self.process_query(query, liveOpId, collect_friends)
                         self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
-                        await asyncio.sleep(3)
+                        time.sleep(3)
 
                 seconds = 1800
                 while seconds > 0:
@@ -1320,22 +1089,14 @@ class Boinkers:
                         f"{Fore.CYAN+Style.BRIGHT}... ]{Style.RESET_ALL}",
                         end="\r"
                     )
-                    await asyncio.sleep(1)
+                    time.sleep(1)
                     seconds -= 1
 
-        except FileNotFoundError:
-            self.log(f"{Fore.RED}File 'query.txt' tidak ditemukan.{Style.RESET_ALL}")
-            return
+        except KeyboardInterrupt:
+            self.log(f"{Fore.RED + Style.BRIGHT}[ EXIT ] Boinkers - BOT{Style.RESET_ALL}")
         except Exception as e:
-            self.log(f"{Fore.RED+Style.BRIGHT}Error: {e}{Style.RESET_ALL}")
+            self.log(f"{Fore.RED + Style.BRIGHT}An error occurred: {e}{Style.RESET_ALL}")
 
 if __name__ == "__main__":
-    try:
-        bot = Boinkers()
-        asyncio.run(bot.main())
-    except KeyboardInterrupt:
-        print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-            f"{Fore.RED + Style.BRIGHT}[ EXIT ] Boinkers - BOT{Style.RESET_ALL}",                                       
-        )
+    bot = Boinkers()
+    bot.main()
